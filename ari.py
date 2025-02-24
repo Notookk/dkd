@@ -51,7 +51,7 @@ def get_main_inline_keyboard():
     keyboard = [
         [
             InlineKeyboardButton("‣ʜᴇʟᴘ‣", callback_data="help"),
-            InlineKeyboardButton("‣ᴀᴅᴅ ᴍᴇ‣", url="https://t.me/copyright_ro_bot?startgroup=true"),
+            InlineKeyboardButton("‣ᴀᴅᴅ ᴍᴇ‣", url="https://t.me/protector_ro_bot?startgroup=true"),
         ],
         [
             InlineKeyboardButton("‣ꜱᴜᴘᴘᴏʀᴛ‣", url="https://t.me/love_mhe"),
