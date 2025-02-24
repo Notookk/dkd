@@ -453,7 +453,7 @@ async def add_user_command(update: Update, context):
         await update.message.reply_text("❌ You don't have permission to add users!")
         return
 
-
+BOT_TOKEN = "7691103794:AAG453Q33UQ1cByVMQ-22ZneBtMHIbP3KZ0"
 async def start_bot():
     """Initialize and run the bot."""
     application = Application.builder().token(BOT_TOKEN).build()
