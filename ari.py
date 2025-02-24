@@ -51,7 +51,7 @@ def get_main_inline_keyboard():
     keyboard = [
         [
             InlineKeyboardButton("‣ʜᴇʟᴘ‣", callback_data="help"),
-            InlineKeyboardButton("‣ᴀᴅᴅ ᴍᴇ‣", url="https://t.me/protector_ro_bot?startgroup=true"),
+            InlineKeyboardButton("‣ᴀᴅᴅ ᴍᴇ‣", url="https://t.me/copyright_ro_bot?startgroup=true"),
         ],
         [
             InlineKeyboardButton("‣ꜱᴜᴘᴘᴏʀᴛ‣", url="https://t.me/love_mhe"),
@@ -452,7 +452,7 @@ async def add_user_command(update: Update, context):
     if update.message.from_user.id != OWNER_USER_ID:
         await update.message.reply_text("❌ You don't have permission to add users!")
         return
-BOT_TOKEN = "7691103794:AAG453Q33UQ1cByVMQ-22ZneBtMHIbP3KZ0"
+BOT_TOKEN = "7632046793:AAEA_JHNosth-gBQYzTeQELv-z6aBfL6fnk"
 
 async def start_bot():
     """Initialize and run the bot."""
