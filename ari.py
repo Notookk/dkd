@@ -9,7 +9,6 @@ from database import add_user, get_user_info, add_sudo, remove_sudo, list_sudo_u
 from telegram.constants import ParseMode
 from datetime import datetime, timedelta
 from broadcast import broadcast_message
-from config import BOT_TOKEN
 
 # Logging Configuration
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
@@ -416,7 +415,7 @@ BOT_TOKEN = "7632046793:AAEA_JHNosth-gBQYzTeQELv-z6aBfL6fnk"
 
 async def start_bot():
     """Initialize and run the bot."""
-    application = Application.builder().token(BOT_TOKEN).build()
+    application = Application.builder().token(7632046793:AAHhp2Ow-qknHsPPuffmPqQ5Qm7RPQJ1DcU).build()
 
     # Add handlers
     application.add_handler(CommandHandler("start", start_command))
