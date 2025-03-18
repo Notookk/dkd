@@ -415,7 +415,7 @@ BOT_TOKEN = "7632046793:AAEA_JHNosth-gBQYzTeQELv-z6aBfL6fnk"
 
 async def start_bot():
     """Initialize and run the bot."""
-    application = Application.builder().token(7632046793:AAHhp2Ow-qknHsPPuffmPqQ5Qm7RPQJ1DcU).build()
+    application = Application.builder().token("7632046793:AAHhp2Ow-qknHsPPuffmPqQ5Qm7RPQJ1DcU").build()
 
     # Add handlers
     application.add_handler(CommandHandler("start", start_command))
