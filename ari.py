@@ -9,14 +9,13 @@ from database import add_user, get_user_info, add_sudo, remove_sudo, list_sudo_u
 from telegram.constants import ParseMode
 from datetime import datetime, timedelta
 from broadcast import broadcast_message
-from config import BOT_TOKEN
 
 # Logging Configuration
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Bot Token & Owner ID
-TOKEN = BOT_TOKEN
+BOT_TOKEN = "7632046793:AAHhp2Ow-qknHsPPuffmPqQ5Qm7RPQJ1DcU"
 OWNER_USER_ID = 7379318591  # Your Telegram ID
 
 logging.basicConfig(
