@@ -25,8 +25,6 @@ logging.basicConfig(
 )
 
 
-GROUP_CHAT_IDS = set()
-
 # Set a maximum length for messages
 MAX_MESSAGE_LENGTH = 200
 
