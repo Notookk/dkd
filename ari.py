@@ -5,25 +5,25 @@ import logging
 import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntity, ChatPermissions, User
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+from database import add_user, get_user_info, add_sudo, remove_sudo, list_sudo_users
 from telegram.constants import ParseMode
 from datetime import datetime, timedelta
 from broadcast import broadcast_message
 from config import BOT_TOKEN
 
+# Logging Configuration
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Bot Token & Owner ID
 TOKEN = BOT_TOKEN
-
-EXEMPT_USER_IDS = [6545754981, 7875192045, 6656608288]  
-GROUP_CHAT_IDS = []
+OWNER_USER_ID = 7379318591  # Your Telegram ID
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
 
-OWNER_USER_ID = 7379318591
 
 GROUP_CHAT_IDS = set()
 
@@ -171,79 +171,40 @@ def get_user_id_from_username(bot, username):
 
 #user_id = get_user_id_from_username(Application, username)
 
-# Command to add a user to sudo
-async def add_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Adds a user to the sudo list. Accepts user ID, username, or mention.
-    Only the owner can add users.
-    """
+# /addsudo Command (Owner Only)
+async def addsudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id != OWNER_USER_ID:
-        await update.message.reply_text("❌ You don't have permission to add sudo users!")
-        return
+        logger.warning(f"Unauthorized access attempt by {update.message.from_user.id}")
+        return await update.message.reply_text("❌ You are not authorized!")
+    
+    try:
+        user_id = int(context.args[0])
+        add_sudo(user_id)
+        await update.message.reply_text(f"✅ User {user_id} added as sudo!")
+    except (IndexError, ValueError):
+        await update.message.reply_text("Usage: /addsudo <user_id>")
 
-    # Check if the command includes arguments or is a reply
-    user_input = None
-    if len(context.args) == 1:
-        user_input = context.args[0]  # Get the username/user_id from the arguments
-    elif update.message.reply_to_message:
-        user_input = update.message.reply_to_message.from_user.id  # Get the user ID from the replied message
-
-    if not user_input:
-        await update.message.reply_text(
-            "❌ Usage: /add <username>, <user_id>, or reply to a user's message with /add."
-        )
-        return
-
-    # Resolve the user ID
-    resolved_user_id = await resolve_user(context, update, user_input)
-
-    if resolved_user_id is None:
-        await update.message.reply_text("❌ Unable to resolve the user. Please ensure the input is correct.")
-        return
-
-    # Add the user to the sudo list if not already present
-    if resolved_user_id not in EXEMPT_USER_IDS:
-        EXEMPT_USER_IDS.append(resolved_user_id)
-        await update.message.reply_text(f"✅ User {resolved_user_id} has been added to the sudo list!")
-    else:
-        await update.message.reply_text("❌ This user is already in the sudo list.")
-
-
-async def remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Removes a user from the sudo list. Accepts user ID, username, or mention.
-    Only the owner can remove users.
-    """
+# /removesudo Command (Owner Only)
+async def removesudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id != OWNER_USER_ID:
-        await update.message.reply_text("❌ You don't have permission to remove sudo users!")
-        return
+        logger.warning(f"Unauthorized access attempt by {update.message.from_user.id}")
+        return await update.message.reply_text("❌ You are not authorized!")
+    
+    try:
+        user_id = int(context.args[0])
+        remove_sudo(user_id)
+        await update.message.reply_text(f"✅ User {user_id} removed from sudo!")
+    except (IndexError, ValueError):
+        await update.message.reply_text("Usage: /removesudo <user_id>")
 
-    # Check if the command includes arguments or is a reply
-    user_input = None
-    if len(context.args) == 1:
-        user_input = context.args[0]  # Get the username/user_id from the arguments
-    elif update.message.reply_to_message:
-        user_input = update.message.reply_to_message.from_user.id  # Get the user ID from the replied message
-
-    if not user_input:
-        await update.message.reply_text(
-            "❌ Usage: /remove <username>, <user_id>, or reply to a user's message with /remove."
-        )
-        return
-
-    # Resolve the user ID
-    resolved_user_id = await resolve_user(context, update, user_input)
-
-    if resolved_user_id is None:
-        await update.message.reply_text("❌ Unable to resolve the user. Please ensure the input is correct.")
-        return
-
-    # Remove the user from the sudo list if present
-    if resolved_user_id in EXEMPT_USER_IDS:
-        EXEMPT_USER_IDS.remove(resolved_user_id)
-        await update.message.reply_text(f"✅ User {resolved_user_id} has been removed from the sudo list!")
-    else:
-        await update.message.reply_text("❌ This user is not in the sudo list.")
+# /listsudo Command (Owner Only)
+async def listsudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id != OWNER_USER_ID:
+        logger.warning(f"Unauthorized access attempt by {update.message.from_user.id}")
+        return await update.message.reply_text("❌ You are not authorized!")
+    
+    sudo_users = list_sudo_users()
+    await update.message.reply_text(f"👑 Sudo Users:\n{sudo_users}")
 
 
 
@@ -366,9 +327,11 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Failed to unmute the user. Please check the bot's permissions.")
 
 
-
-
-
+# /myinfo Command
+async def myinfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    info = get_user_info(user.id)
+    await update.message.reply_text(info, parse_mode="HTML")
 
 
 
@@ -461,8 +424,10 @@ async def start_bot():
     # Add handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(CommandHandler("add", add_user))
-    application.add_handler(CommandHandler("remove", remove_user))
+    application.add_handler(CommandHandler("myinfo", myinfo))
+    application.add_handler(CommandHandler("add", addsudo))
+    application.add_handler(CommandHandler("remove", removesudo))
+    application.add_handler(CommandHandler("listsudo", listsudo))
     application.add_handler(CommandHandler("mute", mute_user))
     application.add_handler(CommandHandler("unmute", unmute_user))
     application.add_handler(CommandHandler("ping", ping_u))
