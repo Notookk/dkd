@@ -18,8 +18,6 @@ class Var:
     if sudo:
         SUDO = make_int(sudo)
 
-BOT_TOKEN = "7632046793:AAHhp2Ow-qknHsPPuffmPqQ5Qm7RPQJ1DcU"
-
 
 
 
