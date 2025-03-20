@@ -363,13 +363,16 @@ async def broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("✅ Broadcast sent to all groups.")
 
-# Error handler function
-async def error_handler(update: Update, context):
-    logger.error(f"Error: {context.error}")
+# Enable nested asyncio loops (Fixes RuntimeError in Heroku, Jupyter, etc.)
+nest_asyncio.apply()
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 async def start_bot():
     """Initialize and run the bot."""
-    application = Application.builder().token("7632046793:AAHhp2Ow-qknHsPPuffmPqQ5Qm7RPQJ1DcU").build()
+    application = Application.builder().token("YOUR_BOT_TOKEN").build()
 
     # Add handlers
     application.add_handler(CommandHandler("start", start_command))
@@ -389,7 +392,7 @@ async def start_bot():
     application.add_error_handler(error_handler)
 
     logger.info("Bot is running...")
-    
+
     try:
         await application.run_polling()
     except Exception as e:
@@ -400,13 +403,14 @@ async def start_bot():
 
 def main():
     """Run the bot safely."""
-    try:
-        logger.info("Starting bot...")
-        asyncio.run(start_bot())  # Ensures proper event loop handling
-    except RuntimeError:
-        # If already inside an event loop (like Heroku or Jupyter)
-        loop = asyncio.get_event_loop()
-        loop.create_task(start_bot())  # Run bot inside existing event loop
+    loop = asyncio.get_event_loop()
+    
+    if loop.is_running():
+        # If inside an existing event loop, create a background task
+        loop.create_task(start_bot())
+    else:
+        # Run normally if no event loop is active
+        asyncio.run(start_bot())
 
 if __name__ == "__main__":
     main()
