@@ -395,7 +395,8 @@ def main():
     """Run the bot safely."""
     try:
         logger.info("Starting bot...")
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         loop.run_until_complete(start_bot())
     except Exception as e:
         logger.error(f"Critical Error in main: {e}", exc_info=True)
