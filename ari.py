@@ -371,9 +371,14 @@ nest_asyncio.apply()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Define a simple error handler function
+async def error_handler(update, context):
+    """Handles all bot errors."""
+    logger.error(f"Exception: {context.error}", exc_info=True)
+
 async def start_bot():
     """Initialize and run the bot."""
-    application = Application.builder().token("YOUR_BOT_TOKEN").build()
+    application = Application.builder().token("7632046793:AAHhp2Ow-qknHsPPuffmPqQ5Qm7RPQJ1DcU").build()
 
     # Add handlers
     application.add_handler(CommandHandler("start", start_command))
@@ -390,6 +395,8 @@ async def start_bot():
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, track_group))
     application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, track_left_member))
     application.add_handler(CommandHandler("broadcast", broadcast_message))
+
+    # Add the missing error handler
     application.add_error_handler(error_handler)
 
     logger.info("Bot is running...")
