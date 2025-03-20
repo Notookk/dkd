@@ -369,13 +369,13 @@ async def error_handler(update: Update, context):
 
 async def start_bot():
     """Initialize and run the bot."""
-    application = Application.builder().token(TOKEN).build()
+    application = Application.builder().token("7632046793:AAHhp2Ow-qknHsPPuffmPqQ5Qm7RPQJ1DcU").build()
 
     # Add handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(CommandHandler("addsudo", addsudo))
-    application.add_handler(CommandHandler("removesudo", removesudo))
+    application.add_handler(CommandHandler("add", addsudo))
+    application.add_handler(CommandHandler("remove", removesudo))
     application.add_handler(CommandHandler("listsudo", listsudo))
     application.add_handler(CommandHandler("mute", mute_user))
     application.add_handler(CommandHandler("unmute", unmute_user))
@@ -389,19 +389,24 @@ async def start_bot():
     application.add_error_handler(error_handler)
 
     logger.info("Bot is running...")
-    await application.run_polling()
+    
+    try:
+        await application.run_polling()
+    except Exception as e:
+        logger.error(f"Error in polling: {e}", exc_info=True)
+    finally:
+        await application.shutdown()
+        logger.info("Bot process finished.")
 
 def main():
     """Run the bot safely."""
     try:
         logger.info("Starting bot...")
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(start_bot())
-    except Exception as e:
-        logger.error(f"Critical Error in main: {e}", exc_info=True)
-    finally:
-        logger.info("Bot process finished.")
+        asyncio.run(start_bot())  # Ensures proper event loop handling
+    except RuntimeError:
+        # If already inside an event loop (like Heroku or Jupyter)
+        loop = asyncio.get_event_loop()
+        loop.create_task(start_bot())  # Run bot inside existing event loop
 
 if __name__ == "__main__":
     main()
