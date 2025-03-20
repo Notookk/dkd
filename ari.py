@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Bot Token & Owner ID
 TOKEN = BOT_TOKEN
-OWNER_USER_ID = 7379318591  # Replace with your Telegram ID
+OWNER_USER_ID = 7875192045  # Replace with your Telegram ID
 
 # List of video file URLs to send randomly
 VIDEO_LIST = [
