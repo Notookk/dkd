@@ -10,6 +10,7 @@ from database import (
     add_exempt_user, remove_exempt_user, list_exempt_users,
     add_muted_user, remove_muted_user, is_muted_user
 )
+from config import BOT_TOKEN
 
 # Logging Configuration
 logging.basicConfig(
@@ -18,6 +19,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Bot Token & Owner ID
+TOKEN = BOT_TOKEN
 OWNER_USER_ID = 7379318591  # Replace with your Telegram ID
 
 # List of video file URLs to send randomly
@@ -366,7 +369,7 @@ async def error_handler(update: Update, context):
 
 async def start_bot():
     """Initialize and run the bot."""
-    application = Application.builder().token("7632046793:AAHhp2Ow-qknHsPPuffmPqQ5Qm7RPQJ1DcU").build()
+    application = Application.builder().token(TOKEN).build()
 
     # Add handlers
     application.add_handler(CommandHandler("start", start_command))
@@ -392,7 +395,8 @@ def main():
     """Run the bot safely."""
     try:
         logger.info("Starting bot...")
-        asyncio.run(start_bot())
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(start_bot())
     except Exception as e:
         logger.error(f"Critical Error in main: {e}", exc_info=True)
     finally:
