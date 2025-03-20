@@ -1,30 +1,24 @@
-import os
 import random
 import asyncio
 import logging
-import requests
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntity, ChatPermissions, User
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
-from database import add_user, get_user_info, add_sudo, remove_sudo, list_sudo_users
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntity, ChatPermissions
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ParseMode
 from datetime import datetime, timedelta
-from broadcast import broadcast_message
+from database import (
+    add_sudo, remove_sudo, list_sudo_users, is_sudo_user,
+    add_exempt_user, remove_exempt_user, list_exempt_users,
+    add_muted_user, remove_muted_user, is_muted_user
+)
 
 # Logging Configuration
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Bot Token & Owner ID
-OWNER_USER_ID = 7379318591  # Your Telegram ID
-
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
+logger = logging.getLogger(__name__)
 
-
-# Set a maximum length for messages
-MAX_MESSAGE_LENGTH = 200
+OWNER_USER_ID = 7379318591  # Replace with your Telegram ID
 
 # List of video file URLs to send randomly
 VIDEO_LIST = [
@@ -35,12 +29,8 @@ VIDEO_LIST = [
     "https://telegra.ph/file/03ac4a6e94b5b4401fa5a.mp4",
 ]
 
-
-async def track_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    if chat.type in ["group", "supergroup"]:
-        GROUP_CHAT_IDS.add(chat.id)
-        logging.info(f"Added group {chat.title} ({chat.id}) to broadcast list.")
+# Set a maximum length for messages
+MAX_MESSAGE_LENGTH = 200
 
 # Function to create the main inline keyboard
 def get_main_inline_keyboard():
@@ -62,8 +52,8 @@ def get_back_inline_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 # Function to check if a user is exempt from deletion
-def is_exempt_user(user_id):
-    return user_id in EXEMPT_USER_IDS
+def is_exempt_user(user_id: int) -> bool:
+    return user_id in list_exempt_users()
 
 # Handler for the /start command
 async def start_command(update: Update, context):
@@ -114,8 +104,8 @@ async def button_handler(update: Update, context):
             "● [/start] - Start the bot\n"
             "● This bot automatically deletes edited messages, long messages, and shared links or PDFs.🍃\n"
             "● If you want to add a new video, send it to @xazoc.🤍\n"
-            "● If you need any kind of helo dm @xotikop_bot🩵\n"
-            "● If you want to add your self in sudo,contact @xazoc.💛\n\n"
+            "● If you need any kind of help, DM @xotikop_bot🩵\n"
+            "● If you want to add yourself in sudo, contact @xazoc.💛\n\n"
             "#𝐒ᴀфᴇ ᴇᴄᴏ🍃 , #𝐗ᴏᴛɪᴋ❤️‍🔥"
         )
         await query.message.edit_caption(help_text, reply_markup=get_back_inline_keyboard())
@@ -132,41 +122,6 @@ async def button_handler(update: Update, context):
         )
         await query.message.edit_caption(caption, reply_markup=get_main_inline_keyboard())
 
-
-# Function to resolve user input
-async def resolve_user(context, update, user_input):
-    try:
-        if str(user_input).isdigit():
-            return int(user_input)
-        elif update.message.reply_to_message:
-            return update.message.reply_to_message.from_user.id
-        elif update.message.entities:
-            for entity in update.message.entities:
-                if entity.type == MessageEntity.MENTION and entity.user:
-                    return entity.user.id
-        else:
-            raise ValueError("Invalid user input.")
-    except Exception as e:
-        print(f"Error resolving user: {e}")
-        await update.message.reply_text("❌ Could not resolve the user. Ensure input is valid.")
-        return None
-
-
-
-import requests
-
-def get_user_id_from_username(bot, username):
-    url = f"https://api.telegram.org/bot{TOKEN}/getChatMember"
-    params = {"chat_id": username, "user_id": username}
-    response = requests.get(url, params=params)
-    if response.status_code == 200:
-        chat_member = response.json()["result"]
-        return chat_member["user"]["id"]
-    else:
-        return None
-
-#user_id = get_user_id_from_username(Application, username)
-
 # /addsudo Command (Owner Only)
 async def addsudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id != OWNER_USER_ID:
@@ -174,11 +129,17 @@ async def addsudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("❌ You are not authorized!")
     
     try:
-        user_id = int(context.args[0])
-        add_sudo(user_id)
-        await update.message.reply_text(f"✅ User {user_id} added as sudo!")
-    except (IndexError, ValueError):
-        await update.message.reply_text("Usage: /addsudo <user_id>")
+        user_input = context.args[0] if context.args else None
+        resolved_user_id = await resolve_user(context, update, user_input)
+
+        if not resolved_user_id:
+            return await update.message.reply_text("❌ Could not resolve the user. Ensure input is valid.")
+
+        add_sudo(resolved_user_id)
+        await update.message.reply_text(f"✅ User {resolved_user_id} added as sudo!")
+    except Exception as e:
+        logger.error(f"Error adding sudo user: {e}")
+        await update.message.reply_text("❌ Failed to add sudo user. Please check the input.")
 
 # /removesudo Command (Owner Only)
 async def removesudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -187,11 +148,17 @@ async def removesudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("❌ You are not authorized!")
     
     try:
-        user_id = int(context.args[0])
-        remove_sudo(user_id)
-        await update.message.reply_text(f"✅ User {user_id} removed from sudo!")
-    except (IndexError, ValueError):
-        await update.message.reply_text("Usage: /removesudo <user_id>")
+        user_input = context.args[0] if context.args else None
+        resolved_user_id = await resolve_user(context, update, user_input)
+
+        if not resolved_user_id:
+            return await update.message.reply_text("❌ Could not resolve the user. Ensure input is valid.")
+
+        remove_sudo(resolved_user_id)
+        await update.message.reply_text(f"✅ User {resolved_user_id} removed from sudo!")
+    except Exception as e:
+        logger.error(f"Error removing sudo user: {e}")
+        await update.message.reply_text("❌ Failed to remove sudo user. Please check the input.")
 
 # /listsudo Command (Owner Only)
 async def listsudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -200,65 +167,23 @@ async def listsudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("❌ You are not authorized!")
     
     sudo_users = list_sudo_users()
-    await update.message.reply_text(f"👑 Sudo Users:\n{sudo_users}")
+    await update.message.reply_text(f"👑 Sudo Users:\n{', '.join(map(str, sudo_users))}")
 
-
-
-
-
-
-
-# Command to mute a user
+# /mute Command
 async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Mutes a user in the chat. Accepts user ID, username, or mention.
-    Usage: /mute <user_id|username|mention> <duration_in_minutes>
-    """
-    # Check if the user executing the command is an admin
     chat_member = await context.bot.get_chat_member(update.effective_chat.id, update.message.from_user.id)
     if not chat_member.status in ["administrator", "creator"]:
-        await update.message.reply_text("❌ You must be a group admin to mute users!")
-        return
+        return await update.message.reply_text("❌ You must be a group admin to mute users!")
 
-    # Check if the target user is provided or replied to
-    user_input = None
-    if context.args:
-        user_input = context.args[0]  # Get the user identifier from arguments
-    elif update.message.reply_to_message:
-        user_input = update.message.reply_to_message.from_user.id
-
-    if not user_input:
-        await update.message.reply_text(
-            "❌ Usage: /mute <user_id|username|mention> <duration_in_minutes>, or reply to a user's message."
-        )
-        return
-
-    # Parse the mute duration
     try:
+        user_input = context.args[0] if context.args else None
         duration = int(context.args[1]) if len(context.args) > 1 else 60  # Default to 60 minutes
-        if duration <= 0:
-            raise ValueError("Duration must be a positive integer.")
-    except (ValueError, IndexError):
-        await update.message.reply_text("❌ Invalid duration. Please provide a positive number of minutes.")
-        return
+        resolved_user_id = await resolve_user(context, update, user_input)
 
-    # Resolve the target user
-    resolved_user_id = await resolve_user(context, update, user_input)
+        if not resolved_user_id:
+            return await update.message.reply_text("❌ Could not resolve the user. Ensure input is valid.")
 
-    if not resolved_user_id:
-        await update.message.reply_text(
-            f"❌ Could not resolve the user '{user_input}'. Please provide a valid input or reply to a user."
-        )
-        return
-
-    # Check if the target user is an admin
-    target_chat_member = await context.bot.get_chat_member(update.effective_chat.id, resolved_user_id)
-    if target_chat_member.status in ["administrator", "creator"]:
-        await update.message.reply_text("❌ You cannot mute another admin!")
-        return
-
-    # Mute the target user
-    try:
+        # Mute the user
         permissions = ChatPermissions(can_send_messages=False)
         until_date = datetime.now() + timedelta(minutes=duration)
         await context.bot.restrict_chat_member(
@@ -267,81 +192,78 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             permissions=permissions,
             until_date=until_date
         )
+        add_muted_user(resolved_user_id, until_date.isoformat())
         await update.message.reply_text(f"✅ User has been muted for {duration} minutes.")
     except Exception as e:
-        print(f"Error while muting user: {e}")
+        logger.error(f"Error while muting user: {e}")
         await update.message.reply_text("❌ Failed to mute the user. Please check the bot's permissions.")
 
-
-
-
-# Command to unmute a user
+# /unmute Command
 async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Unmutes a user in the chat. Accepts user ID, username, or mention.
-    Usage: /unmute <user_id|username|mention>, or reply to a user's message.
-    """
-    # Check if the user executing the command is an admin
     chat_member = await context.bot.get_chat_member(update.effective_chat.id, update.message.from_user.id)
     if not chat_member.status in ["administrator", "creator"]:
-        await update.message.reply_text("❌ You must be a group admin to unmute users!")
-        return
+        return await update.message.reply_text("❌ You must be a group admin to unmute users!")
 
-    # Check if the target user is provided or replied to
-    user_input = None
-    if context.args:
-        user_input = context.args[0]  # Get the user identifier from arguments
-    elif update.message.reply_to_message:
-        user_input = update.message.reply_to_message.from_user.id
-
-    if not user_input:
-        await update.message.reply_text(
-            "❌ Usage: /unmute <user_id|username|mention>, or reply to a user's message."
-        )
-        return
-
-    # Resolve the target user
-    resolved_user_id = await resolve_user(context, update, user_input)
-
-    if not resolved_user_id:
-        await update.message.reply_text(
-            f"❌ Could not resolve the user '{user_input}'. Please provide a valid input or reply to a user."
-        )
-        return
-
-    # Unmute the target user
     try:
-        permissions = ChatPermissions(can_send_messages=True)  # Allow the user to send messages
+        user_input = context.args[0] if context.args else None
+        resolved_user_id = await resolve_user(context, update, user_input)
+
+        if not resolved_user_id:
+            return await update.message.reply_text("❌ Could not resolve the user. Ensure input is valid.")
+
+        # Unmute the user
+        permissions = ChatPermissions(can_send_messages=True)
         await context.bot.restrict_chat_member(
             chat_id=update.effective_chat.id,
             user_id=resolved_user_id,
             permissions=permissions
         )
+        remove_muted_user(resolved_user_id)
         await update.message.reply_text("✅ User has been unmuted.")
     except Exception as e:
-        print(f"Error while unmuting user: {e}")
+        logger.error(f"Error while unmuting user: {e}")
         await update.message.reply_text("❌ Failed to unmute the user. Please check the bot's permissions.")
 
-
-# /myinfo Command
-async def myinfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.message.from_user
-    info = get_user_info(user.id)
-    await update.message.reply_text(info, parse_mode="HTML")
-
-
-
-
-
-
-
 # /ping Command
-async def ping_u(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
     start = datetime.now()
-    event = await update.message.reply_text("Pong!")
+    message = await update.message.reply_text("Pong!")
     end = datetime.now()
     ms = (end - start).microseconds / 1000
-    await event.edit_text(f"**I'm On**\n\n__Pong__ !! {ms} ms", parse_mode=ParseMode.MARKDOWN)
+    await message.edit_text(f"**Pong!** 🏓\nLatency: `{ms} ms`", parse_mode=ParseMode.MARKDOWN)
+
+# /info Command
+async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    info_text = (
+        f"👤 **User Info**\n\n"
+        f"● ID: `{user.id}`\n"
+        f"● Username: @{user.username}\n"
+        f"● Name: {user.first_name} {user.last_name or ''}\n"
+        f"● Is Sudo: {is_sudo_user(user.id)}\n"
+        f"● Is Exempt: {is_exempt_user(user.id)}"
+    )
+    await update.message.reply_text(info_text, parse_mode=ParseMode.MARKDOWN)
+
+# Resolve user by ID, username, or mention
+async def resolve_user(context, update, user_input):
+    try:
+        if str(user_input).isdigit():
+            return int(user_input)
+        elif update.message.reply_to_message:
+            return update.message.reply_to_message.from_user.id
+        elif update.message.entities:
+            for entity in update.message.entities:
+                if entity.type == MessageEntity.MENTION:
+                    username = update.message.text[entity.offset:entity.offset + entity.length].lstrip('@')
+                    user = await context.bot.get_chat(username)
+                    return user.id
+        else:
+            raise ValueError("Invalid user input.")
+    except Exception as e:
+        logger.error(f"Error resolving user: {e}")
+        await update.message.reply_text("❌ Could not resolve the user. Ensure input is valid.")
+        return None
 
 # Handler to delete edited messages
 async def delete_edited_messages(update: Update, context):
@@ -400,18 +322,47 @@ async def delete_invalid_messages(update: Update, context):
             parse_mode=ParseMode.HTML
         )
 
+# Handler to track new chat members
+async def track_group(update: Update, context):
+    for user in update.message.new_chat_members:
+        logger.info(f"New member joined: {user.id} - {user.username}")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"Welcome, {user.mention_html()}! 🎉",
+            parse_mode=ParseMode.HTML
+        )
+
+# Handler to track left chat members
+async def track_left_member(update: Update, context):
+    user = update.message.left_chat_member
+    logger.info(f"Member left: {user.id} - {user.username}")
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"Goodbye, {user.mention_html()}! 👋",
+        parse_mode=ParseMode.HTML
+    )
+
+# /broadcast Command (Owner Only)
+async def broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id != OWNER_USER_ID:
+        return await update.message.reply_text("❌ You are not authorized!")
+
+    message = " ".join(context.args)
+    if not message:
+        return await update.message.reply_text("Usage: /broadcast <message>")
+
+    # Send the message to all groups
+    for chat_id in GROUP_CHAT_IDS:
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=message)
+        except Exception as e:
+            logger.error(f"Failed to send broadcast to {chat_id}: {e}")
+
+    await update.message.reply_text("✅ Broadcast sent to all groups.")
+
 # Error handler function
 async def error_handler(update: Update, context):
-    print(f"Error: {context.error}")
-
-
-# Handler to add user ID to the EXEMPT_USER_IDS list
-async def add_user_command(update: Update, context):
-    # Only allow the owner to use this command
-    if update.message.from_user.id != OWNER_USER_ID:
-        await update.message.reply_text("❌ You don't have permission to add users!")
-        return
-BOT_TOKEN = "7632046793:AAEA_JHNosth-gBQYzTeQELv-z6aBfL6fnk"
+    logger.error(f"Error: {context.error}")
 
 async def start_bot():
     """Initialize and run the bot."""
@@ -420,42 +371,28 @@ async def start_bot():
     # Add handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(CommandHandler("myinfo", myinfo))
-    application.add_handler(CommandHandler("add", addsudo))
-    application.add_handler(CommandHandler("remove", removesudo))
+    application.add_handler(CommandHandler("addsudo", addsudo))
+    application.add_handler(CommandHandler("removesudo", removesudo))
     application.add_handler(CommandHandler("listsudo", listsudo))
     application.add_handler(CommandHandler("mute", mute_user))
     application.add_handler(CommandHandler("unmute", unmute_user))
-    application.add_handler(CommandHandler("ping", ping_u))
-    application.add_handler(CommandHandler("info", get_user_id_from_username))
+    application.add_handler(CommandHandler("ping", ping))
+    application.add_handler(CommandHandler("info", info))
     application.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE, delete_edited_messages))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, delete_invalid_messages))
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, track_group))
-    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, track_group))
+    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, track_left_member))
     application.add_handler(CommandHandler("broadcast", broadcast_message))
     application.add_error_handler(error_handler)
 
     logger.info("Bot is running...")
-    try:
-        await application.initialize()
-        await application.start()
-        await application.updater.start_polling()
-        await asyncio.Event().wait()  # Keeps the bot running
-    except Exception as e:
-        logger.error(f"Critical Error in start_bot: {e}")
-    finally:
-        await application.shutdown()
-
-import httpx
+    await application.run_polling()
 
 def main():
     """Run the bot safely."""
     try:
         logger.info("Starting bot...")
-        result = asyncio.run(start_bot())
-        return result
-    except httpx.HTTPError as e:
-        logger.error(f"HTTP Error: {e}")
+        asyncio.run(start_bot())
     except Exception as e:
         logger.error(f"Critical Error in main: {e}", exc_info=True)
     finally:
