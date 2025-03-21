@@ -1,7 +1,6 @@
 import random
 import asyncio
 import logging
-import nest_asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntity, ChatPermissions
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ParseMode
@@ -11,7 +10,6 @@ from database import (
     add_exempt_user, remove_exempt_user, list_exempt_users,
     add_muted_user, remove_muted_user, is_muted_user
 )
-from config import BOT_TOKEN
 
 # Logging Configuration
 logging.basicConfig(
@@ -21,7 +19,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Bot Token & Owner ID
-TOKEN = BOT_TOKEN
 OWNER_USER_ID = 7875192045  # Replace with your Telegram ID
 
 # List of video file URLs to send randomly
@@ -57,7 +54,7 @@ def get_back_inline_keyboard():
 
 # Function to check if a user is exempt from deletion
 def is_exempt_user(user_id: int) -> bool:
-    return user_id in list_exempt_users()
+    return user_id == OWNER_USER_ID or is_sudo_user(user_id)
 
 # Handler for the /start command
 async def start_command(update: Update, context):
